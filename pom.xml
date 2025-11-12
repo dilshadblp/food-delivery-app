@@ -64,6 +64,8 @@
   <!-- HERE is where we list child modules -->
   <modules>
     <module>common-lib</module>
+    <module>discovery-server</module>
+    <module>api-gateway</module>
     <!-- Later we’ll add:
          <module>discovery-server</module>
          <module>api-gateway</module>

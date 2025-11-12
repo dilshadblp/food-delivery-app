@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        # Demo route: http://localhost:8080/api/httpbin/get -> https://httpbin.org/get
+        - id: httpbin-get
+          uri: https://httpbin.org
+          predicates:
+            - Path=/api/httpbin/**
+          filters:
+            - StripPrefix=2
+            # Later you can add real rate limiter:
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 10
+            #     redis-rate-limiter.burstCapacity: 20
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: always
