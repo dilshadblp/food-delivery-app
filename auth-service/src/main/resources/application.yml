@@ -1,0 +1,41 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: AUTH-SERVICE
+
+  datasource:
+    url: jdbc:mysql://localhost:3307/foodapp?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: food
+    password: food
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+security:
+  jwt:
+    issuer: "foodapp-auth"
+    expires-min: 15
+    # HS256 secret for now (32+ chars). Later we’ll switch to RSA keys + JWKS.
+    secret: "this-is-a-dev-only-secret-change-in-prod-1234567890"

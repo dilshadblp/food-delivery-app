@@ -8,6 +8,10 @@ spring:
   cloud:
     gateway:
       routes:
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates: [ Path=/api/auth/** ]
+          filters: [ StripPrefix=0 ]
         # Demo route: http://localhost:8080/api/httpbin/get -> https://httpbin.org/get
         - id: httpbin-get
           uri: https://httpbin.org
