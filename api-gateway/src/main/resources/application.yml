@@ -12,6 +12,12 @@ spring:
           uri: lb://AUTH-SERVICE
           predicates: [ Path=/api/auth/** ]
           filters: [ StripPrefix=0 ]
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=0
         # Demo route: http://localhost:8080/api/httpbin/get -> https://httpbin.org/get
         - id: httpbin-get
           uri: https://httpbin.org
