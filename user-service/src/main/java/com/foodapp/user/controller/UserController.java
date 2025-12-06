@@ -3,8 +3,8 @@ package com.foodapp.user.controller;
 import com.foodapp.common.ApiException;
 import com.foodapp.user.dto.CreateOrUpdateAddressRequest;
 import com.foodapp.user.dto.UpdateProfileRequest;
-import com.foodapp.user.dto.UserProfileDto;
 import com.foodapp.user.dto.UserAddressDto;
+import com.foodapp.user.dto.UserProfileDto;
 import com.foodapp.user.service.UserProfileService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +20,16 @@ public class UserController {
         this.profileService = profileService;
     }
 
-    // Extract userId from header (later from JWT)
     private Long getUserId(HttpServletRequest request) {
         String id = request.getHeader("X-User-Id");
         if (id == null) {
             throw new ApiException(401, "Missing X-User-Id header");
         }
-        return Long.parseLong(id);
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            throw new ApiException(400, "Invalid X-User-Id header");
+        }
     }
 
     private String getEmail(HttpServletRequest request) {
@@ -44,7 +47,6 @@ public class UserController {
     public ResponseEntity<UserProfileDto> getProfile(HttpServletRequest request) {
         Long userId = getUserId(request);
         String email = getEmail(request);
-
         UserProfileDto dto = profileService.getOrCreateProfile(userId, email);
         return ResponseEntity.ok(dto);
     }

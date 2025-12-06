@@ -1,10 +1,13 @@
 package com.foodapp.auth.controller;
 
 import com.foodapp.auth.dto.AuthResponse;
+import com.foodapp.auth.dto.BlacklistStatusResponse;
 import com.foodapp.auth.dto.LoginRequest;
 import com.foodapp.auth.dto.RegisterRequest;
 import com.foodapp.auth.security.JwtUtil;
 import com.foodapp.auth.service.AuthService;
+import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,15 +41,40 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token, exp));
     }
 
-    // (Optional) logout: client sends Bearer token; we extract jti
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) return ResponseEntity.badRequest().build();
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().build();
+        }
+
         String token = authHeader.substring(7);
-        var claims = jwtUtil.parse(token).getBody();
+        Claims claims = jwtUtil.validateAndGetClaims(token);
+
+        // 1️⃣ Get jti (unique token id)
         String jti = claims.getId();
-        long ttl = (claims.getExpiration().getTime() - System.currentTimeMillis())/1000;
-        service.logout(jti, ttl);
+
+        // 2️⃣ Calculate remaining lifetime in seconds
+        long nowMillis = System.currentTimeMillis();
+        long expMillis = claims.getExpiration().getTime();
+        long ttlSeconds = Math.max(0, (expMillis - nowMillis) / 1000L);
+
+        // 3️⃣ Store in Redis blacklist
+        service.logout(jti, ttlSeconds);
+
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/internal/blacklist/{jti}")
+    public ResponseEntity<BlacklistStatusResponse> checkBlacklist(@PathVariable("jti") String jti) {
+        System.out.println("+++++++++++++++++++++++++++"+jti);
+        try {
+            boolean blacklisted = service.isBlacklisted(jti);
+            return ResponseEntity.ok(new BlacklistStatusResponse(blacklisted));
+        } catch (Exception ex) {
+            // VERY IMPORTANT: prevent 500 for gateway calls
+            return ResponseEntity.ok(new BlacklistStatusResponse(false));
+        }
     }
 }

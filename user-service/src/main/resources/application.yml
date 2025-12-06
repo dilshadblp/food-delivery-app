@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none    # 🔴 important: Flyway controls schema, not Hibernate
+      ddl-auto: update    # 🔴 important: Flyway controls schema, not Hibernate
     show-sql: true
 
   flyway:
