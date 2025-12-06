@@ -66,6 +66,8 @@
     <module>common-lib</module>
     <module>discovery-server</module>
     <module>api-gateway</module>
+    <module>auth-service</module>
+    <module>user-service</module>
     <!-- Later we’ll add:
          <module>discovery-server</module>
          <module>api-gateway</module>
