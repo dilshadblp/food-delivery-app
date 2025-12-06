@@ -10,63 +10,100 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class AuthService {
+
     private final UserAccountRepository repo;
     private final PasswordEncoder encoder;
     private final JwtUtil jwt;
     private final StringRedisTemplate redis;
 
-    public AuthService(UserAccountRepository repo, PasswordEncoder encoder, JwtUtil jwt, StringRedisTemplate redis) {
-        this.repo = repo; this.encoder = encoder; this.jwt = jwt; this.redis = redis;
+    public AuthService(UserAccountRepository repo,
+                       PasswordEncoder encoder,
+                       JwtUtil jwt,
+                       StringRedisTemplate redis) {
+        this.repo = repo;
+        this.encoder = encoder;
+        this.jwt = jwt;
+        this.redis = redis;
     }
 
+    // ==========================
+    // Registration
+    // ==========================
     public void register(RegisterRequest req) {
         if (repo.existsByEmail(req.getEmail())) {
             throw new IllegalArgumentException("Email already registered");
         }
+
         UserAccount u = new UserAccount();
         u.setEmail(req.getEmail().toLowerCase());
         u.setPasswordHash(encoder.encode(req.getPassword()));
         u.setRole("USER");
         u.setStatus("ACTIVE");
+
         try {
             repo.save(u);
         } catch (DataIntegrityViolationException e) {
+            // in case of race condition / unique constraint
             throw new IllegalArgumentException("Email already registered");
         }
     }
 
+    // ==========================
+    // Login
+    // ==========================
     public String login(LoginRequest req) {
-        String key = "login_fail:" + req.getEmail().toLowerCase();
+        // 1) Rate limiting using Redis (login_fail:<email>)
+        String email = req.getEmail().toLowerCase();
+        String key = "login_fail:" + email;
+
         Long attempts = redis.opsForValue().increment(key);
         if (attempts != null && attempts == 1L) {
-            redis.expire(key, 5, TimeUnit.MINUTES); // start 5-min window
+            // first failure → start 5 min window
+            redis.expire(key, 5, TimeUnit.MINUTES);
         }
         if (attempts != null && attempts > 5) {
             throw new IllegalStateException("Too many attempts. Try again in 5 minutes.");
         }
 
-        Optional<UserAccount> or = repo.findByEmail(req.getEmail().toLowerCase());
-        if (or.isEmpty()) throw new IllegalArgumentException("Invalid credentials");
+        // 2) Verify user + status + password
+        Optional<UserAccount> or = repo.findByEmail(email);
+        if (or.isEmpty()) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
 
         UserAccount u = or.get();
-        if (!"ACTIVE".equals(u.getStatus())) throw new IllegalStateException("Account not active");
 
-        if (!encoder.matches(req.getPassword(), u.getPasswordHash()))
+        if (!"ACTIVE".equals(u.getStatus())) {
+            throw new IllegalStateException("Account not active");
+        }
+
+        if (!encoder.matches(req.getPassword(), u.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid credentials");
+        }
 
-        // success: reset counter
+        // 3) Success → reset fail counter
         redis.delete(key);
 
-        return jwt.createToken(u.getId(), u.getRole());
+        // 4) Create RS256 JWT
+        // subject  = email
+        // roles    = list (e.g. ["USER"])
+        return jwt.generateToken(u.getId(),
+                u.getEmail(),
+                List.of(u.getRole())
+        );
     }
 
+    // ==========================
+    // Logout (blacklist by jti)
+    // ==========================
     public void logout(String jti, long ttlSeconds) {
-        // (optional) blacklist:{jti} = true EX ttlSeconds
+        // (optional) store jti in Redis blacklist for 'ttlSeconds'
         redis.opsForValue().set("blacklist:" + jti, "1", ttlSeconds, TimeUnit.SECONDS);
     }
 

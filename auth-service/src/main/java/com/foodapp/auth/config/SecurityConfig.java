@@ -20,7 +20,9 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/auth/health").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register", "/api/auth/logout").permitAll()
+                // 🔐 internal blacklist endpoint – allow gateway to call it without token
+                .requestMatchers(HttpMethod.GET, "/api/auth/internal/blacklist/**").permitAll()
                 .anyRequest().authenticated()
         );
         http.httpBasic(Customizer.withDefaults()); // not used, but okay.
